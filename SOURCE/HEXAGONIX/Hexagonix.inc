@@ -216,7 +216,7 @@ openFileHexagonix:
     pushad
         
     mov esi, fileName
-    mov edi, endBuffer + 1024*10000 + 1024*3000
+    mov edi, [file_buffer]
 
     hx.syscall hx.open
 
@@ -332,7 +332,7 @@ readFileHexagonix:
     push ds
     pop es
     
-    mov esi, endBuffer + 1024*10000 + 1024*3000 
+    mov esi, [file_buffer]
 
     add esi, [filePosition]
 
@@ -534,6 +534,13 @@ getTimeHexagonix:
 
 ;;************************************************************************************
 
+;; Address the source file is loaded into by openFileHexagonix, set once
+;; init_memory has actually allocated the memory backing it
+
+file_buffer dd 0
+
+;;************************************************************************************
+
 ;;************************************************************************************
 ;;
 ;; End of specific implementation for Hexagonix
@@ -618,11 +625,31 @@ init_memory:
 
     mov [stack_limit], eax
 
-    mov [memory_start], endBuffer
-    mov [memory_end], endBuffer + 1024*10000
+;; fasmX (ported from Linux) expects a large scratch region past its own
+;; code for its own symbol tables, tokenized source and the like, plus
+;; somewhere to load the source file being assembled into
+;; (openFileHexagonix/readFileHexagonix, right past additional_memory_end).
+;; Hexagonix only reserves a small fixed margin past a process's own
+;; image (see Hexagon.Kern.Proc.allocateAndLoadImage), nowhere near
+;; enough, so all of this has to be requested from the kernel explicitly
+;; rather than assumed free just past endBuffer
 
-    mov [additional_memory], endBuffer + 1024*10000
-    mov [additional_memory_end], endBuffer + 1024*10000 + 1024*3000
+    mov ebx, 1024*13000 + 1024*4000 ;; Scratch region, plus room for the source file
+
+    hx.syscall hx.malloc
+
+    mov [memory_start], ebx
+
+    mov eax, ebx
+    add eax, 1024*10000
+
+    mov [memory_end], eax
+    mov [additional_memory], eax
+
+    add eax, 1024*3000
+
+    mov [additional_memory_end], eax
+    mov [file_buffer], eax
 
     ret
 
