@@ -439,6 +439,101 @@ fileSeekHexagonix:
 
 ;;************************************************************************************
 
+;; Returns an approximate monotonic millisecond timestamp, used only to
+;; measure elapsed assembly time between two readings taken close
+;; together. hx.time returns the real-time clock's hour/minute/second as
+;; raw BCD bytes (not true ASCII, despite the syscall's name), so each
+;; one is converted to binary before combining into milliseconds since
+;; midnight
+;;
+;; Output:
+;;
+;; EAX - Milliseconds since midnight
+
+getTimeHexagonix:
+
+    push ebx
+    push ecx
+    push edx
+
+    hx.syscall hx.time ;; EAX = hour (BCD), EBX = minute (BCD), ECX = second (BCD)
+
+    call .toBinary ;; EAX = hour, binary
+
+    mov [.hour], eax
+
+    mov eax, ebx
+
+    call .toBinary
+
+    mov [.minute], eax
+
+    mov eax, ecx
+
+    call .toBinary
+
+    mov [.second], eax
+
+    mov eax, [.hour]
+    mov ebx, 3600
+
+    mul ebx
+
+    mov ecx, eax ;; ECX = hour * 3600 seconds
+
+    mov eax, [.minute]
+    mov ebx, 60
+
+    mul ebx
+
+    add ecx, eax ;; ECX += minute * 60 seconds
+
+    add ecx, [.second] ;; ECX = total seconds since midnight
+
+    mov eax, ecx
+    mov ebx, 1000
+
+    mul ebx ;; EAX = milliseconds since midnight
+
+    pop edx
+    pop ecx
+    pop ebx
+
+    ret
+
+.toBinary:
+
+;; Input:
+;;
+;; AL - BCD byte (tens digit in the high nibble, units in the low nibble)
+;;
+;; Output:
+;;
+;; EAX - Binary value
+
+    push ebx
+
+    movzx ebx, al
+
+    mov eax, ebx
+    shr eax, 4
+
+    imul eax, 10 ;; Tens digit
+
+    and ebx, 0Fh ;; Units digit
+
+    add eax, ebx
+
+    pop ebx
+
+    ret
+
+.hour:   dd 0
+.minute: dd 0
+.second: dd 0
+
+;;************************************************************************************
+
 ;;************************************************************************************
 ;;
 ;; End of specific implementation for Hexagonix
