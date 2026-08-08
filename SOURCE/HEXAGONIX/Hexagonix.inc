@@ -218,6 +218,8 @@ openFileHexagonix:
     mov esi, fileName
     mov edi, [file_buffer]
 
+    xor ecx, ecx
+
     hx.syscall hx.open
 
     jc .error
