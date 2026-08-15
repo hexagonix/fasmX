@@ -56,17 +56,7 @@ fasmX:
     mov esi,_memory_suffix
     call    print_string
 
-    mov eax,78
-    mov ebx,buffer
-    xor ecx,ecx
-    int 0x80
-    mov eax,dword [buffer]
-    mov ecx,1000
-    mul ecx
-    mov ebx,eax
-    mov eax,dword [buffer+4]
-    div ecx
-    add eax,ebx
+    call    getTimeHexagonix
     mov [start_time],eax
 
     and [preprocessing_done],0
@@ -82,17 +72,7 @@ fasmX:
     call    display_number
     mov esi,_passes_suffix
     call    print_string
-    mov eax,78
-    mov ebx,buffer
-    xor ecx,ecx
-    int 0x80
-    mov eax,dword [buffer]
-    mov ecx,1000
-    mul ecx
-    mov ebx,eax
-    mov eax,dword [buffer+4]
-    div ecx
-    add eax,ebx
+    call    getTimeHexagonix
     sub eax,[start_time]
     jnc time_ok
     add eax,3600000
@@ -179,7 +159,6 @@ character db ?
 preprocessing_done db ?
 
 predefinitions rb 1000h
-buffer rb 1000h
 
 regES:  dw 0
 

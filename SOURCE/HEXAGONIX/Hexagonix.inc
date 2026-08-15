@@ -216,7 +216,9 @@ openFileHexagonix:
     pushad
         
     mov esi, fileName
-    mov edi, endBuffer + 1024*10000 + 1024*3000
+    mov edi, [file_buffer]
+
+    xor ecx, ecx
 
     hx.syscall hx.open
 
@@ -332,7 +334,7 @@ readFileHexagonix:
     push ds
     pop es
     
-    mov esi, endBuffer + 1024*10000 + 1024*3000 
+    mov esi, [file_buffer]
 
     add esi, [filePosition]
 
@@ -439,6 +441,108 @@ fileSeekHexagonix:
 
 ;;************************************************************************************
 
+;; Returns an approximate monotonic millisecond timestamp, used only to
+;; measure elapsed assembly time between two readings taken close
+;; together. hx.time returns the real-time clock's hour/minute/second as
+;; raw BCD bytes (not true ASCII, despite the syscall's name), so each
+;; one is converted to binary before combining into milliseconds since
+;; midnight
+;;
+;; Output:
+;;
+;; EAX - Milliseconds since midnight
+
+getTimeHexagonix:
+
+    push ebx
+    push ecx
+    push edx
+
+    hx.syscall hx.time ;; EAX = hour (BCD), EBX = minute (BCD), ECX = second (BCD)
+
+    call .toBinary ;; EAX = hour, binary
+
+    mov [.hour], eax
+
+    mov eax, ebx
+
+    call .toBinary
+
+    mov [.minute], eax
+
+    mov eax, ecx
+
+    call .toBinary
+
+    mov [.second], eax
+
+    mov eax, [.hour]
+    mov ebx, 3600
+
+    mul ebx
+
+    mov ecx, eax ;; ECX = hour * 3600 seconds
+
+    mov eax, [.minute]
+    mov ebx, 60
+
+    mul ebx
+
+    add ecx, eax ;; ECX += minute * 60 seconds
+
+    add ecx, [.second] ;; ECX = total seconds since midnight
+
+    mov eax, ecx
+    mov ebx, 1000
+
+    mul ebx ;; EAX = milliseconds since midnight
+
+    pop edx
+    pop ecx
+    pop ebx
+
+    ret
+
+.toBinary:
+
+;; Input:
+;;
+;; AL - BCD byte (tens digit in the high nibble, units in the low nibble)
+;;
+;; Output:
+;;
+;; EAX - Binary value
+
+    push ebx
+
+    movzx ebx, al
+
+    mov eax, ebx
+    shr eax, 4
+
+    imul eax, 10 ;; Tens digit
+
+    and ebx, 0Fh ;; Units digit
+
+    add eax, ebx
+
+    pop ebx
+
+    ret
+
+.hour:   dd 0
+.minute: dd 0
+.second: dd 0
+
+;;************************************************************************************
+
+;; Address the source file is loaded into by openFileHexagonix, set once
+;; init_memory has actually allocated the memory backing it
+
+file_buffer dd 0
+
+;;************************************************************************************
+
 ;;************************************************************************************
 ;;
 ;; End of specific implementation for Hexagonix
@@ -523,11 +627,31 @@ init_memory:
 
     mov [stack_limit], eax
 
-    mov [memory_start], endBuffer
-    mov [memory_end], endBuffer + 1024*10000
+;; fasmX (ported from Linux) expects a large scratch region past its own
+;; code for its own symbol tables, tokenized source and the like, plus
+;; somewhere to load the source file being assembled into
+;; (openFileHexagonix/readFileHexagonix, right past additional_memory_end).
+;; Hexagonix only reserves a small fixed margin past a process's own
+;; image (see Hexagon.Kern.Proc.allocateAndLoadImage), nowhere near
+;; enough, so all of this has to be requested from the kernel explicitly
+;; rather than assumed free just past endBuffer
 
-    mov [additional_memory], endBuffer + 1024*10000
-    mov [additional_memory_end], endBuffer + 1024*10000 + 1024*3000
+    mov ebx, 1024*13000 + 1024*4000 ;; Scratch region, plus room for the source file
+
+    hx.syscall hx.malloc
+
+    mov [memory_start], ebx
+
+    mov eax, ebx
+    add eax, 1024*10000
+
+    mov [memory_end], eax
+    mov [additional_memory], eax
+
+    add eax, 1024*3000
+
+    mov [additional_memory_end], eax
+    mov [file_buffer], eax
 
     ret
 
