@@ -3,7 +3,7 @@
 ; All rights reserved.
 
 ; Hexagonix system interface for flat assembler
-; Copyright (c) 2015-2023, Felipe Miguel Nery Lunkes
+; Copyright (c) 2015-2026, Felipe Miguel Nery Lunkes
 ; All rights reserved.
 
 ;;************************************************************************************
@@ -97,10 +97,23 @@ findString:
 
 finishProcess:
 
+    mov ebx, [memory_start]
+
+    cmp ebx, 0
+    je .noScratchToFree
+
+;; Freeing memory previosly allocated, avoiding memory leaks
+
+    mov ecx, 1024*13000 + 1024*4000
+
+    hx.syscall hx.free
+
+.noScratchToFree:
+
     mov es, [regES]
-    
+
     mov ebx, 00h
-    
+
     hx.syscall hx.exit
 
     ret
@@ -639,6 +652,13 @@ init_memory:
     mov ebx, 1024*13000 + 1024*4000 ;; Scratch region, plus room for the source file
 
     hx.syscall hx.malloc
+
+;; hx.malloc signals failure with EAX = 0 and leaves EBX undefined. Under
+;; low memory this went unchecked and EBX was used as the scratch region
+;; base anyway, corrupting whatever it pointed to instead of failing cleanly
+
+    cmp eax, 0
+    je out_of_memory
 
     mov [memory_start], ebx
 
