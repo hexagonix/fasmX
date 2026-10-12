@@ -38,7 +38,7 @@ getParameters:
     
     mov al, ' '
 
-    hx.syscall hx.findCharacter
+    call findCharacterInString
 
     jc .singleArgument
 
@@ -213,7 +213,7 @@ openFileHexagonix:
 
     mov esi, edx
 
-    hx.syscall hx.stringSize
+    call stringSize
 
     inc eax
     
@@ -277,7 +277,7 @@ createFileHexagonix:
 
     mov esi, edx
 
-    hx.syscall hx.stringSize
+    call stringSize
 
     inc eax
     
@@ -866,3 +866,129 @@ error_suffix db '.'
 lf db 0xA,0
 line_number_start db ' [',0
 line_data_start db ':',0xA,0
+
+;;************************************************************************************
+;;
+;; Measuring a string and finding a character in one were system calls once. They
+;; are arithmetic, and the kernel stopped offering them; they live here rather
+;; than in the system's own library so that this repository still assembles on
+;; its own
+;;
+;;************************************************************************************
+
+stringSize:
+
+    push es
+
+    push ds
+    pop es
+
+    cld
+
+    call .body
+
+    cld ;; A body may have left it set
+
+    pop es
+
+    ret
+
+.body:
+
+    push ecx
+    push esi
+    push edi
+    push es
+
+    push ds ;; Kernel data segment
+    pop es
+
+    mov edi, esi
+
+    or ecx, 0xFFFFFFFF
+
+    xor al, al
+
+    cld ;; Clear direction
+
+    repne scasb ;; Search for end of string in EDI
+
+    or eax, 0xFFFFFFFF
+
+    sub eax, ecx
+
+    dec eax ;; Not including character 0
+
+    pop es
+    pop edi
+    pop esi
+    pop ecx
+
+    ret
+
+;;************************************************************************************
+
+findCharacterInString:
+
+    push es
+
+    push ds
+    pop es
+
+    cld
+
+    call .body
+
+    cld ;; A body may have left it set
+
+    pop es
+
+    ret
+
+.body:
+
+    push ebx
+    push ecx
+    push edx
+    push esi
+
+    mov bl, al
+    xor ecx, ecx
+
+.findLoop:
+
+    lodsb
+
+    or al, al ;; cmp AL, 0 (last character)
+    jz .next
+
+    cmp al, bl ;; Character found
+    jne .findLoop
+
+    inc ecx ;; Counter
+
+    jmp .findLoop
+
+.next:
+
+    mov eax, ecx
+
+    or eax, eax ;; cmp EDX, 0
+    jz .notFound
+
+    clc
+
+    jmp .end
+
+.notFound:
+
+    stc
+
+.end:
+
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+
+    ret
