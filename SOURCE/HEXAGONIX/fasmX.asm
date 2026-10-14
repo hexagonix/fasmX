@@ -14,8 +14,8 @@ use32
 
 include "HAPP.s" ;; Here is a structure for the HAPP header
 
-;; Instance | Structure | Architecture | Version | Subversion | Entry Point | Image type
-appHeader headerHAPP HAPP.Architectures.i386, 1, 00, fasmX, 01h
+;; Architecture | Version | Subversion | Entry point | Image type
+headerHAPP HAPP.Architectures.i386, 1, 00, fasmX, 01h
 
 ;;************************************************************************************
 
